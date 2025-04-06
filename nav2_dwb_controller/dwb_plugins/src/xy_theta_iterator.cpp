@@ -54,13 +54,13 @@ void XYThetaIterator::initialize(
 
   nav2_util::declare_parameter_if_not_declared(
     nh,
-    plugin_name + ".vx_samples", rclcpp::ParameterValue(20));
+    plugin_name + ".vx_samples", rclcpp::ParameterValue(2000));
   nav2_util::declare_parameter_if_not_declared(
     nh,
-    plugin_name + ".vy_samples", rclcpp::ParameterValue(5));
+    plugin_name + ".vy_samples", rclcpp::ParameterValue(500));
   nav2_util::declare_parameter_if_not_declared(
     nh,
-    plugin_name + ".vtheta_samples", rclcpp::ParameterValue(20));
+    plugin_name + ".vtheta_samples", rclcpp::ParameterValue(2000));
 
   nh->get_parameter(plugin_name + ".vx_samples", vx_samples_);
   nh->get_parameter(plugin_name + ".vy_samples", vy_samples_);
