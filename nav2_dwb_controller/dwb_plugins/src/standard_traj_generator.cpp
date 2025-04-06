@@ -219,7 +219,7 @@
    double complex_factor = 0.0;
    
    // Set a small number of threads to reduce overhead
-   omp_set_num_threads(5);
+   omp_set_num_threads(6);
    
    #pragma omp parallel reduction(+:complex_factor)
    {
