@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 3.5)
 project(dwb_core)
 
+# Find OpenMP
+find_package(OpenMP REQUIRED)
+
 find_package(ament_cmake REQUIRED)
 find_package(nav2_common REQUIRED)
 find_package(rclcpp REQUIRED)
@@ -51,6 +54,12 @@ add_library(dwb_core SHARED
 ament_target_dependencies(dwb_core
   ${dependencies}
 )
+
+# Add OpenMP specific settings
+target_link_libraries(dwb_core
+  ${OpenMP_CXX_LIBRARIES}
+)
+target_compile_options(dwb_core PRIVATE ${OpenMP_CXX_FLAGS})
 
 install(TARGETS dwb_core
   ARCHIVE DESTINATION lib

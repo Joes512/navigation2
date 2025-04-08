@@ -355,41 +355,70 @@ DWBLocalPlanner::coreScoringAlgorithm(
   IllegalTrajectoryTracker tracker;
 
   traj_generator_->startNewIteration(velocity);
-  while (traj_generator_->hasMoreTwists()) {
-    twist = traj_generator_->nextTwist();
-    traj = traj_generator_->generateTrajectory(pose, velocity, twist);
+  
+  // First collect all twists in a buffer
+  std::vector<nav_2d_msgs::msg::Twist2D> twist_buffer;
+  int i = 0;
 
+  for (i = 0; i < 10000; i++) {
+    twist_buffer.push_back(traj_generator_->nextTwist());
+  }
+
+  // Prepare vectors to store results
+  std::vector<dwb_msgs::msg::TrajectoryScore> all_scores;
+  all_scores.resize(twist_buffer.size());
+  std::vector<bool> is_legal(twist_buffer.size(), true);
+  std::vector<dwb_msgs::msg::Trajectory2D> trajectories(twist_buffer.size());
+  std::vector<std::string> critic_names(twist_buffer.size());
+
+  // Process trajectories in parallel using OpenMP with limited threads
+  // #pragma omp parallel for num_threads(8)
+  // #pragma omp parallel for
+  for (size_t i = 0; i < twist_buffer.size(); ++i) {
     try {
-      dwb_msgs::msg::TrajectoryScore score = scoreTrajectory(traj, best.total);
+      // Generate trajectory
+      trajectories[i] = traj_generator_->generateTrajectory(pose, velocity, twist_buffer[i]);
+      
+      // Score trajectory
+      all_scores[i] = scoreTrajectory(trajectories[i], -1);  // Don't use best.total for early pruning
+      is_legal[i] = true;
+    } catch (const dwb_core::IllegalTrajectoryException & e) {
+      is_legal[i] = false;
+      critic_names[i] = e.getCriticName();
+    }
+  }
+
+  // Process results sequentially
+  for (size_t i = 0; i < twist_buffer.size(); ++i) {
+    if (is_legal[i]) {
       tracker.addLegalTrajectory();
       if (results) {
-        results->twists.push_back(score);
+        results->twists.push_back(all_scores[i]);
       }
-      if (best.total < 0 || score.total < best.total) {
-        best = score;
+      if (best.total < 0 || all_scores[i].total < best.total) {
+        best = all_scores[i];
         if (results) {
           results->best_index = results->twists.size() - 1;
         }
       }
-      if (worst.total < 0 || score.total > worst.total) {
-        worst = score;
+      if (worst.total < 0 || all_scores[i].total > worst.total) {
+        worst = all_scores[i];
         if (results) {
           results->worst_index = results->twists.size() - 1;
         }
       }
-    } catch (const dwb_core::IllegalTrajectoryException & e) {
+    } else {
       if (results) {
         dwb_msgs::msg::TrajectoryScore failed_score;
-        failed_score.traj = traj;
-
+        failed_score.traj = trajectories[i];
         dwb_msgs::msg::CriticScore cs;
-        cs.name = e.getCriticName();
+        cs.name = critic_names[i];
         cs.raw_score = -1.0;
         failed_score.scores.push_back(cs);
         failed_score.total = -1.0;
         results->twists.push_back(failed_score);
       }
-      tracker.addIllegalTrajectory(e);
+      tracker.addIllegalTrajectory(dwb_core::IllegalTrajectoryException(critic_names[i], ""));
     }
   }
 
